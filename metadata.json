@@ -1,0 +1,5 @@
+{
+  "name": "PromptLib",
+  "description": "A Pinterest-style library of high-quality AI image prompts for Midjourney, DALL-E, and Stable Diffusion.",
+  "requestFramePermissions": []
+}
