@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
 import PromptCard from '../components/PromptCard';
 import MasonryGrid from '../components/MasonryGrid';
+import AdBanner from '../components/AdBanner';
 import { useAuth } from '../context/AuthContext';
 
 export default function Home() {
@@ -87,6 +88,8 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <AdBanner />
+
       <MasonryGrid>
         {prompts.map(prompt => (
           <PromptCard 
@@ -100,7 +103,7 @@ export default function Home() {
       
       {loading && (
         <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>
         </div>
       )}
       

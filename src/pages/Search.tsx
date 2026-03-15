@@ -123,22 +123,22 @@ export default function Search() {
         </div>
         <input
           type="text"
-          className="block w-full pl-11 pr-24 py-4 border border-gray-200 rounded-2xl leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:bg-white focus:ring-2 focus:ring-black focus:border-transparent text-lg transition-all shadow-sm"
+          className="block w-full pl-11 pr-24 py-4 border border-gray-200 dark:border-zinc-800 rounded-2xl leading-5 bg-gray-50 dark:bg-zinc-900 placeholder-gray-500 dark:placeholder-zinc-500 focus:outline-none focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent text-lg transition-all shadow-sm dark:text-white"
           placeholder="Search prompts, tags, categories..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
-        <button type="submit" className="absolute inset-y-2 right-2 px-6 bg-black text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors">
+        <button type="submit" className="absolute inset-y-2 right-2 px-6 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-medium hover:bg-gray-800 dark:hover:bg-zinc-200 transition-colors">
           Search
         </button>
       </form>
 
-      <h1 className="text-3xl font-bold mb-8 text-center sm:text-left">
+      <h1 className="text-3xl font-bold mb-8 text-center sm:text-left dark:text-white transition-colors">
         {query ? `Search results for "${query}"` : category ? `Category: ${category}` : 'Discover Prompts'}
       </h1>
       
       {prompts.length === 0 && !loading && (
-        <div className="text-center text-gray-500 py-12">
+        <div className="text-center text-gray-500 dark:text-zinc-500 py-12">
           No prompts found. Try a different search term or category.
         </div>
       )}
@@ -156,7 +156,7 @@ export default function Search() {
       
       {loading && (
         <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>
         </div>
       )}
       

@@ -55,7 +55,29 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (prompt_id) REFERENCES prompts(id)
   );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
+
+// Seed default settings
+try {
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_ads', '1');
+} catch (e) {}
+
+// Add views and copies columns to prompts if they don't exist
+try {
+  db.prepare('ALTER TABLE prompts ADD COLUMN views INTEGER DEFAULT 0').run();
+} catch (e) {
+  // Column might already exist, ignore
+}
+try {
+  db.prepare('ALTER TABLE prompts ADD COLUMN copies INTEGER DEFAULT 0').run();
+} catch (e) {
+  // Column might already exist, ignore
+}
 
 // Seed admin user if not exists
 const adminEmail = 'admin@example.com';
@@ -173,6 +195,30 @@ app.post('/api/auth/register', (req, res) => {
   }
 });
 
+// Settings
+app.get('/api/settings', (req, res) => {
+  try {
+    const settings = db.prepare('SELECT * FROM settings').all() as any[];
+    const settingsObj = settings.reduce((acc, curr) => {
+      acc[curr.key] = curr.value;
+      return acc;
+    }, {});
+    res.json(settingsObj);
+  } catch (error) {
+    res.json({ show_ads: '1' }); // Fallback
+  }
+});
+
+app.post('/api/admin/settings', authenticateToken, requireAdmin, (req, res) => {
+  const { show_ads } = req.body;
+  try {
+    db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(show_ads ? '1' : '0', 'show_ads');
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
 // Prompts
 app.get('/api/prompts', (req, res) => {
   const { category, search, page = 1, limit = 20 } = req.query;
@@ -229,6 +275,48 @@ app.get('/api/prompts/:id/similar', (req, res) => {
 
   const similar = db.prepare('SELECT * FROM prompts WHERE category = ? AND id != ? LIMIT 4').all(prompt.category, prompt.id);
   res.json(similar);
+});
+
+// Analytics Tracking
+app.post('/api/prompts/:id/view', (req, res) => {
+  try {
+    db.prepare('UPDATE prompts SET views = COALESCE(views, 0) + 1 WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update views' });
+  }
+});
+
+app.post('/api/prompts/:id/copy', (req, res) => {
+  try {
+    db.prepare('UPDATE prompts SET copies = COALESCE(copies, 0) + 1 WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update copies' });
+  }
+});
+
+// Admin Stats
+app.get('/api/admin/stats', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const usersCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as any).count;
+    const promptsCount = (db.prepare('SELECT COUNT(*) as count FROM prompts').get() as any).count;
+    const totalViews = (db.prepare('SELECT SUM(views) as total FROM prompts').get() as any).total || 0;
+    const totalCopies = (db.prepare('SELECT SUM(copies) as total FROM prompts').get() as any).total || 0;
+    
+    const topPrompts = db.prepare('SELECT id, title, views, copies, category FROM prompts ORDER BY views DESC LIMIT 5').all();
+
+    res.json({
+      users: usersCount,
+      prompts: promptsCount,
+      views: totalViews,
+      copies: totalCopies,
+      topPrompts
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
 });
 
 // Admin Upload

@@ -44,7 +44,7 @@ export default function Favorites() {
   };
 
   if (isLoading) {
-    return <div className="min-h-[80vh] flex items-center justify-center">Loading...</div>;
+    return <div className="min-h-[80vh] flex items-center justify-center dark:text-white">Loading...</div>;
   }
 
   if (!user) {
@@ -53,14 +53,14 @@ export default function Favorites() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Saved Prompts</h1>
+      <h1 className="text-3xl font-bold mb-8 dark:text-white transition-colors">Saved Prompts</h1>
       
       {loading ? (
         <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>
         </div>
       ) : prompts.length === 0 ? (
-        <div className="text-center text-gray-500 py-12">
+        <div className="text-center text-gray-500 dark:text-zinc-500 py-12">
           You haven't saved any prompts yet.
         </div>
       ) : (
