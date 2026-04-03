@@ -2,45 +2,67 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Users, FileText, Eye, Copy, TrendingUp, Settings } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, getDocs, doc, getDoc, setDoc, query, orderBy, limit } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function AdminDashboard() {
-  const { isAdmin, token, isLoading } = useAuth();
+  const { isAdmin, isLoading } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [showAds, setShowAds] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isAdmin && token) {
-      Promise.all([
-        fetch('/api/admin/stats', { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json()),
-        fetch('/api/settings').then(res => res.json())
-      ])
-        .then(([statsData, settingsData]) => {
-          setStats(statsData);
-          setShowAds(settingsData.show_ads === '1');
+    if (isAdmin) {
+      const fetchDashboardData = async () => {
+        try {
+          // Fetch settings
+          const settingsDoc = await getDoc(doc(db, 'settings', 'show_ads'));
+          if (settingsDoc.exists()) {
+            setShowAds(settingsDoc.data().value === '1');
+          }
+
+          // Fetch stats
+          const usersSnap = await getDocs(collection(db, 'users'));
+          const promptsSnap = await getDocs(collection(db, 'prompts'));
+          
+          let totalViews = 0;
+          let totalCopies = 0;
+          const promptsData = promptsSnap.docs.map(d => {
+            const data = d.data() as any;
+            totalViews += (data.views || 0);
+            totalCopies += (data.copies || 0);
+            return { id: d.id, ...data };
+          });
+
+          // Sort for top prompts
+          const topPrompts = [...promptsData].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
+
+          setStats({
+            users: usersSnap.size,
+            prompts: promptsSnap.size,
+            views: totalViews,
+            copies: totalCopies,
+            topPrompts
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, 'dashboard_data');
+        } finally {
           setLoading(false);
-        })
-        .catch(err => {
-          console.error('Failed to fetch dashboard data', err);
-          setLoading(false);
-        });
+        }
+      };
+
+      fetchDashboardData();
     }
-  }, [isAdmin, token]);
+  }, [isAdmin]);
 
   const toggleAds = async () => {
     const newValue = !showAds;
     setShowAds(newValue);
     try {
-      await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ show_ads: newValue })
-      });
+      await setDoc(doc(db, 'settings', 'show_ads'), { value: newValue ? '1' : '0' });
     } catch (error) {
-      console.error('Failed to update settings', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'settings/show_ads');
       setShowAds(!newValue); // Revert on failure
     }
   };

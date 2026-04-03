@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Prompt": {
+      "title": "Prompt",
+      "description": "An AI prompt shared by a user or admin",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "prompt_text": { "type": "string" },
+        "image_url": { "type": "string" },
+        "category": { "type": "string" },
+        "tags": { "type": "string" },
+        "upvote_count": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "prompt_text", "category"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "A user's favorite prompt",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "promptId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "promptId"]
+    },
+    "Upvote": {
+      "title": "Upvote",
+      "description": "A user's upvote on a prompt",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "promptId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "promptId"]
+    },
+    "Collection": {
+      "title": "Collection",
+      "description": "A user's collection of prompts",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name"]
+    },
+    "CollectionPrompt": {
+      "title": "CollectionPrompt",
+      "description": "A prompt inside a collection",
+      "type": "object",
+      "properties": {
+        "collectionId": { "type": "string" },
+        "promptId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["collectionId", "promptId"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Global app settings",
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "required": ["value"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/prompts/{promptId}": {
+      "schema": { "$ref": "#/entities/Prompt" },
+      "description": "Prompts"
+    },
+    "/favorites/{favoriteId}": {
+      "schema": { "$ref": "#/entities/Favorite" },
+      "description": "Favorites"
+    },
+    "/upvotes/{upvoteId}": {
+      "schema": { "$ref": "#/entities/Upvote" },
+      "description": "Upvotes"
+    },
+    "/collections/{collectionId}": {
+      "schema": { "$ref": "#/entities/Collection" },
+      "description": "Collections"
+    },
+    "/collection_prompts/{collectionPromptId}": {
+      "schema": { "$ref": "#/entities/CollectionPrompt" },
+      "description": "Prompts in collections"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Setting" },
+      "description": "Global settings"
+    }
+  }
+}

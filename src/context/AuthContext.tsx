@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { auth, db } from '../firebase';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   role: string;
 }
@@ -9,13 +13,15 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
   isAdmin: boolean;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const DEFAULT_ADMIN_EMAIL = 'chaudharynitinbhai575@gmail.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -23,49 +29,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const storedToken = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      if (storedToken && storedUser) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
         try {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
-        } catch (e) {
-          console.error('Failed to parse user from localStorage', e);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          const token = await firebaseUser.getIdToken();
+          setToken(token);
+          
+          // Check if user exists in Firestore
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          let userDoc;
+          try {
+            userDoc = await getDoc(userDocRef);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
+          }
+
+          if (userDoc && userDoc.exists()) {
+            setUser({ id: firebaseUser.uid, email: firebaseUser.email || '', role: userDoc.data().role });
+          } else {
+            // Create user
+            const isDefaultAdmin = firebaseUser.email === DEFAULT_ADMIN_EMAIL;
+            const newUser = {
+              email: firebaseUser.email || '',
+              role: isDefaultAdmin ? 'admin' : 'user',
+              createdAt: new Date().toISOString()
+            };
+            try {
+              await setDoc(userDocRef, newUser);
+            } catch (error) {
+              handleFirestoreError(error, OperationType.CREATE, `users/${firebaseUser.uid}`);
+            }
+            setUser({ id: firebaseUser.uid, email: firebaseUser.email || '', role: newUser.role });
+          }
+        } catch (error) {
+          console.error('Error fetching user data', error);
+          setUser(null);
+          setToken(null);
         }
+      } else {
+        setUser(null);
+        setToken(null);
       }
-    } catch (e) {
-      console.error('Failed to access localStorage', e);
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
-    setToken(newToken);
-    setUser(newUser);
+  const login = async () => {
+    const provider = new GoogleAuthProvider();
     try {
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(newUser));
-    } catch (e) {
-      console.error('Failed to set localStorage', e);
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error('Error signing in with Google', error);
+      throw error;
     }
   };
 
-  const logout = () => {
-    setToken(null);
-    setUser(null);
+  const logout = async () => {
     try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    } catch (e) {
-      console.error('Failed to remove localStorage', e);
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error signing out', error);
     }
   };
+
+  const isAdmin = user?.role === 'admin' || user?.email === DEFAULT_ADMIN_EMAIL;
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAdmin: user?.role === 'admin', isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAdmin, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

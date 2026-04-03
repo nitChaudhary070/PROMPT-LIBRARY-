@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { db } from '../firebase';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function AdminUpload() {
-  const { isAdmin, token, isLoading } = useAuth();
+  const { isAdmin, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [promptText, setPromptText] = useState('');
   const [category, setCategory] = useState('');
@@ -17,12 +22,22 @@ export default function AdminUpload() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    fetch('/api/categories')
-      .then(res => res.json())
-      .then(data => {
-        setCategories(data);
-        if (data.length > 0) setCategory(data[0]);
-      });
+    const fetchCategories = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'prompts'));
+        const cats = new Set<string>();
+        snap.forEach(doc => {
+          const cat = doc.data().category;
+          if (cat) cats.add(cat);
+        });
+        const catArray = Array.from(cats).sort();
+        setCategories(catArray);
+        if (catArray.length > 0) setCategory(catArray[0]);
+      } catch (error) {
+        console.error('Failed to fetch categories', error);
+      }
+    };
+    fetchCategories();
   }, []);
 
   if (isLoading) {
@@ -45,40 +60,44 @@ export default function AdminUpload() {
     setLoading(true);
     setMessage('');
 
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('prompt_text', promptText);
-    formData.append('category', finalCategory);
-    formData.append('tags', tags);
-    
-    if (image) {
-      formData.append('image', image);
-    } else if (imageUrl) {
-      formData.append('image_url', imageUrl);
-    }
-
     try {
-      const res = await fetch('/api/prompts', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
+      let finalImageUrl = imageUrl;
+      
+      if (image) {
+        if (image.size > 700 * 1024) {
+          setMessage('Image is too large. Please use an image under 700KB or provide a URL instead.');
+          setLoading(false);
+          return;
+        }
+        // Convert image to base64
+        const reader = new FileReader();
+        finalImageUrl = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(image);
+        });
+      }
+
+      await addDoc(collection(db, 'prompts'), {
+        title,
+        prompt_text: promptText,
+        category: finalCategory,
+        tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [],
+        image_url: finalImageUrl,
+        createdAt: new Date().toISOString(),
+        views: 0,
+        copies: 0,
+        upvote_count: 0
       });
 
-      if (res.ok) {
-        setMessage('Prompt uploaded successfully!');
-        setTitle('');
-        setPromptText('');
-        setTags('');
-        setImage(null);
-        setImageUrl('');
-      } else {
-        const data = await res.json();
-        setMessage(data.error || 'Upload failed');
-      }
+      setMessage('Prompt uploaded successfully! Redirecting...');
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
+      
     } catch (error) {
-      setMessage('An error occurred during upload');
+      console.error("Upload error:", error);
+      setMessage('An error occurred during upload: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }
@@ -197,7 +216,7 @@ export default function AdminUpload() {
                   </label>
                   <p className="pl-1">or provide URL</p>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-zinc-500">PNG, JPG, GIF up to 10MB</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">PNG, JPG, GIF up to 700KB</p>
               </div>
             </div>
             {image && <p className="mt-2 text-sm text-green-600 dark:text-green-400">Selected file: {image.name}</p>}

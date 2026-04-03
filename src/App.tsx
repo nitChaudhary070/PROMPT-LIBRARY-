@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
@@ -31,6 +32,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
               </Routes>
             </main>
+            <Toaster position="bottom-center" toastOptions={{ className: 'dark:bg-zinc-900 dark:text-white dark:border-zinc-800' }} />
           </div>
         </Router>
       </AuthProvider>

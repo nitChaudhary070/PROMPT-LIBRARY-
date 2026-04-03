@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { db } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function Categories() {
   const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch('/api/categories')
-      .then(res => res.json())
-      .then(data => setCategories(data));
+    const fetchCategories = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'prompts'));
+        const cats = new Set<string>();
+        snap.forEach(doc => {
+          const cat = doc.data().category;
+          if (cat) cats.add(cat);
+        });
+        setCategories(Array.from(cats).sort());
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'prompts');
+      }
+    };
+    fetchCategories();
   }, []);
 
   return (
