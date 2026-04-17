@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { db } from '../firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { db, storage } from '../firebase';
+import { collection, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigate } from 'react-router-dom';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
@@ -22,23 +23,22 @@ export default function AdminUpload() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'prompts'));
-        const cats = new Set<string>();
-        snap.forEach(doc => {
-          const cat = doc.data().category;
-          if (cat) cats.add(cat);
-        });
-        const catArray = Array.from(cats).sort();
-        setCategories(catArray);
-        if (catArray.length > 0) setCategory(catArray[0]);
-      } catch (error) {
-        console.error('Failed to fetch categories', error);
-      }
-    };
-    fetchCategories();
-  }, []);
+    const promptsRef = collection(db, 'prompts');
+    const unsubscribe = onSnapshot(promptsRef, (snap) => {
+      const cats = new Set<string>();
+      snap.forEach(doc => {
+        const cat = doc.data().category;
+        if (cat) cats.add(cat);
+      });
+      const catArray = Array.from(cats).sort();
+      setCategories(catArray);
+      if (catArray.length > 0 && !category) setCategory(catArray[0]);
+    }, (error) => {
+      console.error('Failed to fetch categories', error);
+    });
+
+    return () => unsubscribe();
+  }, [category]);
 
   if (isLoading) {
     return <div className="min-h-[80vh] flex items-center justify-center dark:text-white">Loading...</div>;
@@ -64,31 +64,53 @@ export default function AdminUpload() {
       let finalImageUrl = imageUrl;
       
       if (image) {
-        if (image.size > 700 * 1024) {
-          setMessage('Image is too large. Please use an image under 700KB or provide a URL instead.');
+        if (image.size > 10 * 1024 * 1024) {
+          setMessage('Image is too large. Please use an image under 10MB or provide a URL instead.');
           setLoading(false);
           return;
         }
-        // Convert image to base64
-        const reader = new FileReader();
-        finalImageUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(image);
-        });
+        
+        try {
+          // Upload image to Firebase Storage
+          const fileExtension = image.name.split('.').pop();
+          const fileName = `prompts/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+          const storageRef = ref(storage, fileName);
+          
+          await uploadBytes(storageRef, image);
+          finalImageUrl = await getDownloadURL(storageRef);
+        } catch (storageError) {
+          console.error("Storage upload error:", storageError);
+          // Fallback to base64 if storage fails (e.g., due to rules)
+          if (image.size > 700 * 1024) {
+             setMessage('Storage upload failed and image is too large for database fallback. Please use an image under 700KB or provide a URL instead.');
+             setLoading(false);
+             return;
+          }
+          const reader = new FileReader();
+          finalImageUrl = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(image);
+          });
+        }
       }
 
-      await addDoc(collection(db, 'prompts'), {
-        title,
-        prompt_text: promptText,
-        category: finalCategory,
-        tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [],
-        image_url: finalImageUrl,
-        createdAt: new Date().toISOString(),
-        views: 0,
-        copies: 0,
-        upvote_count: 0
-      });
+      try {
+        await addDoc(collection(db, 'prompts'), {
+          title,
+          prompt_text: promptText,
+          category: finalCategory,
+          tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [],
+          image_url: finalImageUrl,
+          createdAt: new Date().toISOString(),
+          views: 0,
+          copies: 0,
+          upvote_count: 0
+        });
+      } catch (dbError) {
+        handleFirestoreError(dbError, OperationType.CREATE, 'prompts');
+        throw dbError;
+      }
 
       setMessage('Prompt uploaded successfully! Redirecting...');
       setTimeout(() => {
@@ -216,7 +238,7 @@ export default function AdminUpload() {
                   </label>
                   <p className="pl-1">or provide URL</p>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-zinc-500">PNG, JPG, GIF up to 700KB</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">PNG, JPG, GIF up to 10MB</p>
               </div>
             </div>
             {image && <p className="mt-2 text-sm text-green-600 dark:text-green-400">Selected file: {image.name}</p>}

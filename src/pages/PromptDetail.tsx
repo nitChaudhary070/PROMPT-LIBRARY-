@@ -24,6 +24,7 @@ export default function PromptDetail() {
   const [upvoteDocId, setUpvoteDocId] = useState<string | null>(null);
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', prompt_text: '', category: '', tags: '' });
   const { user, isAdmin } = useAuth();
 
@@ -394,9 +395,25 @@ export default function PromptDetail() {
             <div className="flex-grow">
               <h3 className="text-lg font-semibold mb-2 dark:text-white">Prompt</h3>
               <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-4 border border-gray-100 dark:border-zinc-700 relative group transition-colors">
-                <p className="text-gray-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap font-mono text-sm">
+                <p className={`text-gray-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap font-mono text-sm ${!isExpanded && prompt.prompt_text.length > 300 ? 'line-clamp-4' : ''}`}>
                   {prompt.prompt_text}
                 </p>
+                {!isExpanded && prompt.prompt_text.length > 300 && (
+                  <button 
+                    onClick={() => setIsExpanded(true)}
+                    className="text-blue-600 dark:text-blue-400 text-sm font-medium mt-2 hover:underline"
+                  >
+                    Show More
+                  </button>
+                )}
+                {isExpanded && prompt.prompt_text.length > 300 && (
+                  <button 
+                    onClick={() => setIsExpanded(false)}
+                    className="text-blue-600 dark:text-blue-400 text-sm font-medium mt-2 hover:underline"
+                  >
+                    Show Less
+                  </button>
+                )}
                 <button 
                   onClick={handleCopy}
                   className="absolute top-4 right-4 p-2 bg-white dark:bg-zinc-900 shadow-sm rounded-lg border border-gray-200 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2"

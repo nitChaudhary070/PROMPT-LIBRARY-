@@ -35,8 +35,8 @@ service cloud.firestore {
 
     function isValidPrompt() {
       return hasOnlyAllowedFields(['title', 'prompt_text', 'image_url', 'category', 'tags', 'upvote_count', 'views', 'copies', 'createdAt']) &&
-             isValidString('title', 1, 200) &&
-             isValidString('prompt_text', 1, 5000) &&
+             isValidString('title', 1, 500) &&
+             isValidString('prompt_text', 1, 50000) &&
              isValidString('category', 1, 100) &&
              request.resource.data.image_url is string &&
              request.resource.data.tags is list &&
